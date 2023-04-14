@@ -17,7 +17,7 @@ def handle_message(update, context):
     else:
         context.user_data[user_id] = {'last_message': message.text.lower(), 'count': 1} # Новое сообщение - сбросить счетчик
 
-updater = Updater(token='5856175367:AAEkhw1xhW_CldHfOzZoMvwM5-0Au_mLmxM', use_context=True)
+updater = Updater(token='API_token', use_context=True)
 message_handler = MessageHandler(Filters.text & (~Filters.command), handle_message)
 updater.dispatcher.add_handler(message_handler)
 updater.start_polling()
