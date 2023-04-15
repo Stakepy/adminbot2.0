@@ -1,24 +1,57 @@
 import telegram
 from telegram.ext import Updater, MessageHandler, Filters
-import time
+from telegram import ChatPermissions
+import datetime
+import threading
+
+def reset_counters(context, user_id):
+    context.user_data[user_id]["text_count"] = 0
+    context.user_data[user_id]["sticker_count"] = 0
 
 def handle_message(update, context):
     message = update.message
-    user_id = message.from_user.id
     chat_id = message.chat_id
-    if message.text.lower() == context.user_data.get(user_id, {}).get('last_message', None):
-        if context.user_data.get(user_id, {}).get('count', 0) >= 4: # Если пользователь отправил одно и тоже сообщение более 5 раз подряд
-            permissions = telegram.ChatPermissions(send_messages=False)
-            context.bot.restrict_chat_member(chat_id, user_id, permissions=permissions, until_date=time.time() + 300) # Ограничить отправку сообщений на 5 минут (300 секунд)
-            context.bot.send_message(chat_id=chat_id, text='Вы были заблокированы на 5 минут за спам')
-            context.user_data[user_id]['count'] = 0 # Обнулить счетчик сообщений
-        else:
-            context.user_data[user_id]['count'] += 1 # Увеличить счетчик сообщений
-    else:
-        context.user_data[user_id] = {'last_message': message.text.lower(), 'count': 1} # Новое сообщение - сбросить счетчик
+    user_id = message.from_user.id
 
-updater = Updater(token='API_token', use_context=True)
-message_handler = MessageHandler(Filters.text & (~Filters.command), handle_message)
-updater.dispatcher.add_handler(message_handler)
+    # Проверяем, является ли сообщение ответом на сообщение другого пользователя
+    if message.reply_to_message and message.reply_to_message.from_user.id != user_id:
+        context.user_data[user_id]["text_count"] = 0
+        context.user_data[user_id]["sticker_count"] = 0
+
+    # Проверяем, является ли сообщение текстом или стикером
+    if message.text:
+        context.user_data.setdefault(user_id, {"text_count": 0, "sticker_count": 0})
+        context.user_data[user_id]["text_count"] += 1
+    elif message.sticker:
+        context.user_data.setdefault(user_id, {"text_count": 0, "sticker_count": 0})
+        context.user_data[user_id]["sticker_count"] += 1
+
+    # Проверяем, превышает ли количество текстовых сообщений или стикеров
+    if context.user_data[user_id]["text_count"] > 8 or context.user_data[user_id]["sticker_count"] > 8:
+        # Запрещаем пользователю печатать сообщения на 10 минут
+        until_date = message.date + datetime.timedelta(seconds=600)
+        permissions = ChatPermissions()
+        permissions.can_send_messages = False
+        context.bot.restrict_chat_member(chat_id, user_id, until_date=until_date, permissions=telegram.ChatPermissions())
+
+        # Отправляем сообщение о блокировке
+        context.bot.send_message(chat_id=chat_id,
+                                 text=f"Пользователь {message.from_user.first_name} заблокирован на 10 минут.")
+
+        # Сбрасываем счетчики сообщений
+        context.user_data[user_id]["text_count"] = 0
+        context.user_data[user_id]["sticker_count"] = 0
+
+    # Создаем таймер, чтобы счетчики обнулялись каждые 12 секунд
+    timer = threading.Timer(12.0, reset_counters, [context, user_id])
+    timer.start()
+
+updater = Updater(token="5856175367:AAEjtX5_wjkt8NhuwBnUhBediloa14X5U6A", use_context=True)
+dispatcher = updater.dispatcher
+
+dispatcher.add_handler(MessageHandler(Filters.all, handle_message))
+
 updater.start_polling()
 updater.idle()
+
+
