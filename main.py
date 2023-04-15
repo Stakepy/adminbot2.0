@@ -46,7 +46,7 @@ def handle_message(update, context):
     timer = threading.Timer(12.0, reset_counters, [context, user_id])
     timer.start()
 
-updater = Updater(token="5856175367:AAEjtX5_wjkt8NhuwBnUhBediloa14X5U6A", use_context=True)
+updater = Updater(token="API_token", use_context=True)
 dispatcher = updater.dispatcher
 
 dispatcher.add_handler(MessageHandler(Filters.all, handle_message))
